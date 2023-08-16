@@ -16,6 +16,7 @@
 
 static FlutterPluginRegistrantCallback registerPlugins = nil;
 static BackgroundLocatorPlugin *instance = nil;
+extern BOOL wasAppTerminated;
 
 #pragma mark FlutterPlugin Methods
 
@@ -56,11 +57,14 @@ static BackgroundLocatorPlugin *instance = nil;
 // iOS will launch the app when new location received
 - (BOOL)application:(UIApplication *)application
 didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
+
     // Check to see if we're being launched due to a location event.
     if (launchOptions[UIApplicationLaunchOptionsLocationKey] != nil) {
         // Restart the headless service.
         [self startLocatorService:[PreferencesManager getCallbackDispatcherHandle]];
         [PreferencesManager setObservingRegion:YES];
+
+         NSLog(@"flutter: Plugin: start with UIApplicationLaunchOptionsLocationKey");
     } else if([PreferencesManager isObservingRegion]) {
         [self prepareLocationManager];
         [self removeLocator];
@@ -79,6 +83,7 @@ didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
 }
 
 -(void)applicationWillTerminate:(UIApplication *)application {
+
     [self observeRegionForLocation:_lastLocation];
     if([PreferencesManager isStopWithTerminate]){
         [self removeLocator];
@@ -105,12 +110,16 @@ didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
 #pragma mark LocationManagerDelegate Methods
 - (void)locationManager:(CLLocationManager *)manager
      didUpdateLocations:(NSArray<CLLocation *> *)locations {
+   
     if (locations.count > 0) {
         CLLocation* location = [locations objectAtIndex:0];
         [self prepareLocationMap: location];
         if([PreferencesManager isObservingRegion]) {
             [self observeRegionForLocation: location];
-            [_locationManager stopUpdatingLocation];
+             NSLog(@"flutter: plugin - locationManager.observeRegionForLocation");
+           
+          //  exit(0);
+            //[_locationManager stopUpdatingLocation];
         }
     }
 }
@@ -122,6 +131,7 @@ didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
 
 #pragma mark LocatorPlugin Methods
 - (void) sendLocationEvent: (NSDictionary<NSString*,NSNumber*>*)location {
+
     NSString *isolateId = [_headlessRunner isolateId];
     if (_callbackChannel == nil || isolateId == nil) {
         return;
@@ -131,7 +141,13 @@ didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
                      kArgCallback : @([PreferencesManager getCallbackHandle:kCallbackKey]),
                      kArgLocation: location
                      };
-    [_callbackChannel invokeMethod:kBCMSendLocation arguments:map];
+    [_callbackChannel invokeMethod:kBCMSendLocation arguments:map result:^(id _Nullable result) {
+        if ([PreferencesManager isAppTerminated]) {
+            NSLog(@"flutter: Plugin: terminate app");
+           // exit(0);
+        }
+    }];
+    
 }
 
 - (instancetype)init:(NSObject<FlutterPluginRegistrar> *)registrar {
@@ -160,6 +176,7 @@ didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
 #pragma mark MethodCallHelperDelegate
 
 - (void)startLocatorService:(int64_t)handle {
+    NSLog(@"flutter: Plugin: start locator service");
     [PreferencesManager setCallbackDispatcherHandle:handle];
     FlutterCallbackInformation *info = [FlutterCallbackCache lookupCallbackInformation:handle];
     NSAssert(info != nil, @"failed to find callback");
@@ -185,6 +202,7 @@ didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
   initialDataDictionary:(NSDictionary*)initialDataDictionary
         disposeCallback:(int64_t)disposeCallback
                settings: (NSDictionary*)settings {
+    NSLog(@"flutter: Plugin: register locator");
     [self->_locationManager requestAlwaysAuthorization];
         
     long accuracyKey = [[settings objectForKey:kSettingsAccuracy] longValue];
@@ -221,6 +239,7 @@ didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
 }
 
 - (void)removeLocator {
+    NSLog(@"flutter: Plugin: remove locator");
     if (_locationManager == nil) {
         return;
     }
