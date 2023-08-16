@@ -142,10 +142,7 @@ didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
                      kArgLocation: location
                      };
     [_callbackChannel invokeMethod:kBCMSendLocation arguments:map result:^(id _Nullable result) {
-        if ([PreferencesManager isAppTerminated]) {
-            NSLog(@"flutter: Plugin: terminate app");
-           // exit(0);
-        }
+
     }];
     
 }
